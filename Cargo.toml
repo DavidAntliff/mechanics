@@ -1,0 +1,16 @@
+[package]
+name = "colliding_balls"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = { version = "0.14.2", features = ["dynamic_linking"] }
+rand_core = "0.6.4"
+bevy_rand = "0.7.1"
+bevy_prng = { version = "0.7.1", features = ["rand_chacha"] }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
