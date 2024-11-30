@@ -1,3 +1,4 @@
+use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy_prng::ChaCha8Rng;
@@ -51,6 +52,10 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(EntropyPlugin::<ChaCha8Rng>::with_seed(seed))
+        .add_plugins((
+            FrameTimeDiagnosticsPlugin::default(),
+            LogDiagnosticsPlugin::default(),
+        ))
         .add_systems(Startup, setup)
         .add_systems(
             FixedUpdate,
@@ -120,7 +125,7 @@ fn setup(
     let half_height = window.single().height() / 2.0;
 
     // Random Balls
-    let num_balls = 1000;
+    let num_balls = 10;
     for i in 0..num_balls {
         let ball = BallDefaults {
             starting_position: Vec3::new(
@@ -128,7 +133,7 @@ fn setup(
                 (random_float(&mut rng) - 0.5) * window.single().height(),
                 0.0,
             ),
-            diameter: 5.0,
+            diameter: 10.0 + random_float(&mut rng) * 90.0,
             speed: 100.0 * SPEED_SCALING,
             initial_direction: Vec2::new(
                 (random_float(&mut rng) - 0.5),
@@ -198,15 +203,14 @@ fn ball_collision_system(
         let r1 = t1.scale.x / 2.0;
         let r2 = t2.scale.x / 2.0;
 
-        let m1 = 1.0f32;
-        let m2 = 1.0f32;
-
         // TODO: check for missing entirely due to speed
 
         let distance = x1.distance(x2);
         if distance < r1 + r2 {
             // Collision detected
-            //println!("hit!");
+            let m1 = r1 * r1 / 1000.0;
+            let m2 = r2 * r2 / 1000.0;
+
             //collision_events.send(CollisionEvent);
 
             // Use conservation of momentum to calculate new velocities
@@ -221,7 +225,7 @@ fn ball_collision_system(
 
             let collision_normal = (x2 - x1).normalize();
 
-            // TODO: resolve overlap
+            // resolve overlap
             let overlap = (r1 + r2) - distance;
             t1.translation -= (overlap / 2.0) * collision_normal.extend(0.0);
             t2.translation += (overlap / 2.0) * collision_normal.extend(0.0);
