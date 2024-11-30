@@ -3,11 +3,15 @@ name = "colliding_balls"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+stepping = ["bevy/bevy_debug_stepping"]
+
 [dependencies]
 bevy = { version = "0.14.2", features = ["dynamic_linking"] }
 rand_core = "0.6.4"
 bevy_rand = "0.7.1"
 bevy_prng = { version = "0.7.1", features = ["rand_chacha"] }
+bevy_text = "0.14.2"
 
 [profile.dev]
 opt-level = 1

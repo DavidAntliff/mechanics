@@ -1,6 +1,9 @@
+mod stepping;
+
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
+use bevy::window::PresentMode;
 use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
 use rand_core::RngCore;
@@ -13,45 +16,37 @@ struct BallDefaults {
     color: Color,
 }
 
-const SPEED_SCALING: f32 = 1.0; //20.0;
+const DEFAULT_WINDOW_WIDTH: f32 = 600.0;
+const DEFAULT_WINDOW_HEIGHT: f32 = 600.0;
 
-const BALL_DEFAULTS: [BallDefaults; 4] = [
-    BallDefaults {
-        starting_position: Vec3::new(-300.0, 300.0, 0.0),
-        diameter: 50.0,
-        speed: 145.0 * SPEED_SCALING,
-        initial_direction: Vec2::new(0.5, -0.5),
-        color: Color::srgb(0.8, 0.7, 0.6),
-    },
-    BallDefaults {
-        starting_position: Vec3::new(300.0, 300.0, 0.0),
-        diameter: 50.0,
-        speed: 155.0 * SPEED_SCALING,
-        initial_direction: Vec2::new(-0.5, -0.5),
-        color: Color::srgb(0.7, 0.6, 0.8),
-    },
-    BallDefaults {
-        starting_position: Vec3::new(-300.0, -300.0, 0.0),
-        diameter: 50.0,
-        speed: 100.0 * SPEED_SCALING,
-        initial_direction: Vec2::new(0.5, 0.5),
-        color: Color::srgb(0.6, 0.8, 0.7),
-    },
-    BallDefaults {
-        starting_position: Vec3::new(300.0, -300.0, 0.0),
-        diameter: 50.0,
-        speed: 110.0 * SPEED_SCALING,
-        initial_direction: Vec2::new(-0.5, 0.5),
-        color: Color::srgb(0.7, 0.8, 0.6),
-    },
-];
+//const NUM_BALLS: usize = 2000;
+const NUM_BALLS: usize = 500;
+
+const SPEED_SCALING: f32 = 1.0; //20.0;
 
 fn main() {
     let seed = [0u8; 32];
 
     App::new()
-        .add_plugins(DefaultPlugins)
+        // Disable VSYNC
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                // Turn off vsync to maximize CPU/GPU usage
+                present_mode: PresentMode::AutoNoVsync,
+                ..default()
+            }),
+            ..default()
+        }))
+        // Enable stepping when compiled with '--features=bevy_debug_stepping'
+        .add_plugins(
+            stepping::SteppingPlugin::default()
+                .add_schedule(Update)
+                .add_schedule(FixedUpdate)
+                .at(Val::Percent(35.0), Val::Percent(50.0)),
+        )
+        // See the random number generator
         .add_plugins(EntropyPlugin::<ChaCha8Rng>::with_seed(seed))
+        // Add diagnostics
         .add_plugins((
             FrameTimeDiagnosticsPlugin::default(),
             LogDiagnosticsPlugin::default(),
@@ -70,11 +65,14 @@ struct MyCamera;
 #[derive(Component, Deref, DerefMut)]
 struct Velocity(Vec2);
 
-#[derive(Event, Default)]
-struct CollisionEvent;
-
 #[derive(Component)]
-struct Collider;
+struct Mass(f32);
+
+// #[derive(Event, Default)]
+// struct CollisionEvent;
+//
+// #[derive(Component)]
+// struct Collider;
 
 #[derive(Component)]
 struct Ball;
@@ -90,9 +88,14 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut rng: ResMut<GlobalEntropy<ChaCha8Rng>>,
-    window: Query<&Window>,
-    asset_server: Res<AssetServer>,
+    mut window: Query<&mut Window>,
+    _asset_server: Res<AssetServer>,
 ) {
+    window
+        .single_mut()
+        .resolution
+        .set(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT);
+
     // Camera
     commands.spawn((
         Camera2dBundle {
@@ -106,38 +109,49 @@ fn setup(
         MyCamera,
     ));
 
-    // Balls
-    // for ball in BALL_DEFAULTS {
-    //     commands.spawn((
-    //         MaterialMesh2dBundle {
-    //             mesh: meshes.add(Circle::default()).into(),
-    //             material: materials.add(ball.color),
-    //             transform: Transform::from_translation(ball.starting_position)
-    //                 .with_scale(Vec2::splat(ball.diameter).extend(1.0)),
-    //             ..default()
-    //         },
-    //         Ball,
-    //         Velocity(ball.initial_direction.normalize() * ball.speed),
-    //     ));
-    // }
+    let _half_width = window.single().width() / 2.0;
+    let _half_height = window.single().height() / 2.0;
 
-    let half_width = window.single().width() / 2.0;
-    let half_height = window.single().height() / 2.0;
+    let spawn_radius_max = _half_width / 2.0;
+    let spawn_velocity_max = 100.0 * SPEED_SCALING;
 
     // Random Balls
-    let num_balls = 10;
-    for i in 0..num_balls {
+    for _ in 0..NUM_BALLS {
+        //let radius = 2.5;
+        let radius = 2.5 + random_float(&mut rng) * 2.5;
+        let mass = radius * radius / 1000.0;
+
+        // Spawn in a circular region
+        let spawn_region_radius = random_float(&mut rng);
+
+        // Spread them out a bit more with quadratic distribution
+        let spawn_region_radius = spawn_region_radius * spawn_region_radius * spawn_radius_max;
+
+        let spawn_region_angle = random_float(&mut rng) * std::f32::consts::PI * 2.0;
+        let spawn_region_x = spawn_region_radius * spawn_region_angle.cos();
+        let spawn_region_y = spawn_region_radius * spawn_region_angle.sin();
+
+        // Random velocity
+        let spawn_speed = random_float(&mut rng) * spawn_velocity_max;
+        let spawn_direction = random_float(&mut rng) * std::f32::consts::PI * 2.0;
+        let spawn_velocity_x = spawn_speed * spawn_direction.cos();
+        let spawn_velocity_y = spawn_speed * spawn_direction.sin();
+
         let ball = BallDefaults {
             starting_position: Vec3::new(
-                (random_float(&mut rng) - 0.5) * window.single().width(),
-                (random_float(&mut rng) - 0.5) * window.single().height(),
+                //(random_float(&mut rng) - 0.5) * window.single().width(),
+                //(random_float(&mut rng) - 0.5) * window.single().height(),
+                spawn_region_x,
+                spawn_region_y,
                 0.0,
             ),
-            diameter: 10.0 + random_float(&mut rng) * 90.0,
-            speed: 100.0 * SPEED_SCALING,
+            diameter: radius * 2.0,
+            speed: spawn_speed,
             initial_direction: Vec2::new(
-                (random_float(&mut rng) - 0.5),
-                (random_float(&mut rng) - 0.5),
+                //random_float(&mut rng) - 0.5,
+                //random_float(&mut rng) - 0.5,
+                spawn_velocity_x,
+                spawn_velocity_y,
             ),
             color: Color::srgb(
                 random_float(&mut rng),
@@ -145,6 +159,7 @@ fn setup(
                 random_float(&mut rng),
             ),
         };
+
         commands.spawn((
             MaterialMesh2dBundle {
                 mesh: meshes.add(Circle::default()).into(),
@@ -155,6 +170,7 @@ fn setup(
             },
             Ball,
             Velocity(ball.initial_direction.normalize() * ball.speed),
+            Mass(mass),
         ));
     }
 }
@@ -190,12 +206,12 @@ fn ball_warp_system(mut query: Query<&mut Transform, With<Ball>>, window: Query<
 }
 
 fn ball_collision_system(
-    mut query: Query<(&mut Transform, &mut Velocity), With<Ball>>,
+    mut query: Query<(&mut Transform, &mut Velocity, &Mass), With<Ball>>,
     //    mut collision_events: EventWriter<CollisionEvent>,
 ) {
     let mut combinations = query.iter_combinations_mut();
 
-    while let Some([(mut t1, mut v1), (mut t2, mut v2)]) = combinations.fetch_next() {
+    while let Some([(mut t1, mut v1, m1), (mut t2, mut v2, m2)]) = combinations.fetch_next() {
         let x1 = t1.translation.truncate();
         let x2 = t2.translation.truncate();
 
@@ -208,9 +224,6 @@ fn ball_collision_system(
         let distance = x1.distance(x2);
         if distance < r1 + r2 {
             // Collision detected
-            let m1 = r1 * r1 / 1000.0;
-            let m2 = r2 * r2 / 1000.0;
-
             //collision_events.send(CollisionEvent);
 
             // Use conservation of momentum to calculate new velocities
@@ -237,8 +250,11 @@ fn ball_collision_system(
                 continue;
             }
 
-            let w1 = (2.0 * m2) / (m1 + m2) * v_normal / (x1 - x2).length_squared() * (x1 - x2);
-            let w2 = (2.0 * m1) / (m1 + m2) * v_normal / (x2 - x1).length_squared() * (x2 - x1);
+            let combined_mass = m1.0 + m2.0;
+            let w1 =
+                (2.0 * m2.0) / combined_mass * v_normal / (x1 - x2).length_squared() * (x1 - x2);
+            let w2 =
+                (2.0 * m1.0) / combined_mass * v_normal / (x2 - x1).length_squared() * (x2 - x1);
 
             v1.0 -= w1;
             v2.0 -= w2;

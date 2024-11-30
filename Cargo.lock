@@ -1374,6 +1374,7 @@ dependencies = [
  "bevy",
  "bevy_prng",
  "bevy_rand",
+ "bevy_text",
  "rand_core",
 ]
 
