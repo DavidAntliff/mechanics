@@ -1,7 +1,7 @@
 [workspace]
 members = [
-    #"lib/*",
-    "bin/*", "lib/stuff",
+    "lib/*",
+    "bin/*",
 ]
 resolver = "2"
 
