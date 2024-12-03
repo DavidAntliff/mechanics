@@ -1,14 +1,14 @@
-mod stepping;
-
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::window::PresentMode;
 use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
-use rand_core::RngCore;
 use scarlet::colormap::{ColorMap, GradientColorMap};
 use scarlet::prelude::*;
+use stuff::my_color::MyColor;
+use stuff::random::random_float;
+use stuff::stepping;
 
 struct BallDefaults {
     starting_position: Vec3,
@@ -78,12 +78,6 @@ struct Mass(f32);
 
 #[derive(Component)]
 struct Ball;
-
-fn random_float(rng: &mut ResMut<GlobalEntropy<ChaCha8Rng>>) -> f32 {
-    // Generate a u32 and normalize it to a floating-point value in [0.0, 1.0]
-    let random_u32 = rng.next_u32();
-    random_u32 as f32 / u32::MAX as f32
-}
 
 fn radius_transform(u: f32, n: f32) -> f32 {
     u.powf(1.0 / n)
@@ -293,24 +287,5 @@ fn ball_collision_system(
             v1.0 -= w1;
             v2.0 -= w2;
         }
-    }
-}
-
-// For conversion from Scarlet to Bevy Color types - both are sRGB
-struct MyColor(bevy::color::Color);
-
-impl From<scarlet::color::RGBColor> for MyColor {
-    fn from(value: RGBColor) -> Self {
-        MyColor(bevy::color::Color::srgb(
-            value.r as f32,
-            value.g as f32,
-            value.b as f32,
-        ))
-    }
-}
-
-impl From<MyColor> for bevy::color::Color {
-    fn from(value: MyColor) -> Self {
-        value.0
     }
 }
