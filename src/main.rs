@@ -7,20 +7,22 @@ use bevy::window::PresentMode;
 use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
 use rand_core::RngCore;
+use scarlet::colormap::{ColorMap, GradientColorMap};
+use scarlet::prelude::*;
 
 struct BallDefaults {
     starting_position: Vec3,
     diameter: f32,
     speed: f32,
     initial_direction: Vec2,
-    color: Color,
+    color: bevy::color::Color,
 }
 
 const DEFAULT_WINDOW_WIDTH: f32 = 600.0;
 const DEFAULT_WINDOW_HEIGHT: f32 = 600.0;
 
 //const NUM_BALLS: usize = 2000;
-const NUM_BALLS: usize = 500;
+const NUM_BALLS: usize = 100;
 
 const SPEED_SCALING: f32 = 1.0; //20.0;
 
@@ -83,6 +85,10 @@ fn random_float(rng: &mut ResMut<GlobalEntropy<ChaCha8Rng>>) -> f32 {
     random_u32 as f32 / u32::MAX as f32
 }
 
+fn radius_transform(u: f32, n: f32) -> f32 {
+    u.powf(1.0 / n)
+}
+
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -101,7 +107,7 @@ fn setup(
         Camera2dBundle {
             camera: Camera {
                 //clear_color: ClearColorConfig::None,
-                clear_color: ClearColorConfig::Custom(Color::srgb(0.0, 0.0, 0.0)),
+                clear_color: ClearColorConfig::Custom(bevy::color::Color::srgb(0.0, 0.0, 0.0)),
                 ..default()
             },
             ..default()
@@ -112,20 +118,22 @@ fn setup(
     let _half_width = window.single().width() / 2.0;
     let _half_height = window.single().height() / 2.0;
 
+    //let spawn_radius_max = 2.0 * _half_width / 3.0;
     let spawn_radius_max = _half_width / 2.0;
     let spawn_velocity_max = 100.0 * SPEED_SCALING;
 
     // Random Balls
     for _ in 0..NUM_BALLS {
-        //let radius = 2.5;
-        let radius = 2.5 + random_float(&mut rng) * 2.5;
-        let mass = radius * radius / 1000.0;
+        let max_radius = 5.0;
+        let min_radius = 2.5;
+        let radius_param = random_float(&mut rng);
+        let radius = min_radius + radius_param * (max_radius - min_radius);
 
-        // Spawn in a circular region
-        let spawn_region_radius = random_float(&mut rng);
+        let mass = radius_param * radius_param; // normalised
 
-        // Spread them out a bit more with quadratic distribution
-        let spawn_region_radius = spawn_region_radius * spawn_region_radius * spawn_radius_max;
+        // Spawn in a circular region, spread out a bit
+        let spawn_radius_norm = radius_transform(random_float(&mut rng), 2.0);
+        let spawn_region_radius = spawn_radius_max * spawn_radius_norm;
 
         let spawn_region_angle = random_float(&mut rng) * std::f32::consts::PI * 2.0;
         let spawn_region_x = spawn_region_radius * spawn_region_angle.cos();
@@ -137,27 +145,31 @@ fn setup(
         let spawn_velocity_x = spawn_speed * spawn_direction.cos();
         let spawn_velocity_y = spawn_speed * spawn_direction.sin();
 
+        // let color = Color::srgb(
+        //     random_float(&mut rng),
+        //     random_float(&mut rng),
+        //     random_float(&mut rng),
+        // );
+        let color_map = GradientColorMap::new_linear(
+            RGBColor {
+                r: 1.0,
+                g: 0.0,
+                b: 0.0,
+            },
+            RGBColor {
+                r: 0.2,
+                g: 0.2,
+                b: 1.0,
+            },
+        );
+        let color: MyColor = color_map.transform_single(spawn_radius_norm as f64).into();
+
         let ball = BallDefaults {
-            starting_position: Vec3::new(
-                //(random_float(&mut rng) - 0.5) * window.single().width(),
-                //(random_float(&mut rng) - 0.5) * window.single().height(),
-                spawn_region_x,
-                spawn_region_y,
-                0.0,
-            ),
+            starting_position: Vec3::new(spawn_region_x, spawn_region_y, 0.0),
             diameter: radius * 2.0,
             speed: spawn_speed,
-            initial_direction: Vec2::new(
-                //random_float(&mut rng) - 0.5,
-                //random_float(&mut rng) - 0.5,
-                spawn_velocity_x,
-                spawn_velocity_y,
-            ),
-            color: Color::srgb(
-                random_float(&mut rng),
-                random_float(&mut rng),
-                random_float(&mut rng),
-            ),
+            initial_direction: Vec2::new(spawn_velocity_x, spawn_velocity_y),
+            color: color.into(),
         };
 
         commands.spawn((
@@ -244,13 +256,35 @@ fn ball_collision_system(
             t2.translation += (overlap / 2.0) * collision_normal.extend(0.0);
 
             let v_normal = (v1.0 - v2.0).dot(x1 - x2);
-
             if v_normal > 0.0 {
                 // Already moving apart
                 continue;
             }
 
+            // let relative_velocity = (v1.0 - v2.0).dot(collision_normal);
+            // if relative_velocity > 0.0 {
+            //     // Already moving apart
+            //     continue;
+            // }
+
             let combined_mass = m1.0 + m2.0;
+
+            // let e = 1.0; // Coefficient of restitution
+            // let inverse_mass_sum = (1.0 / m1.0) + (1.0 / m2.0);
+            //
+            // // Compute impulse
+            // let impulse = -(1.0 + e) * relative_velocity / inverse_mass_sum;
+            // let impulse_vector = impulse * collision_normal;
+            //
+            // v1.0 += impulse_vector / m1.0;
+            // v2.0 -= impulse_vector / m2.0;
+
+            // let w1 = (2.0 * m2.0) / combined_mass * e * relative_velocity * collision_normal;
+            // let w2 = (2.0 * m1.0) / combined_mass * e * relative_velocity * collision_normal;
+            //
+            // v1.0 -= w1;
+            // v2.0 += w2;
+
             let w1 =
                 (2.0 * m2.0) / combined_mass * v_normal / (x1 - x2).length_squared() * (x1 - x2);
             let w2 =
@@ -259,5 +293,24 @@ fn ball_collision_system(
             v1.0 -= w1;
             v2.0 -= w2;
         }
+    }
+}
+
+// For conversion from Scarlet to Bevy Color types - both are sRGB
+struct MyColor(bevy::color::Color);
+
+impl From<scarlet::color::RGBColor> for MyColor {
+    fn from(value: RGBColor) -> Self {
+        MyColor(bevy::color::Color::srgb(
+            value.r as f32,
+            value.g as f32,
+            value.b as f32,
+        ))
+    }
+}
+
+impl From<MyColor> for bevy::color::Color {
+    fn from(value: MyColor) -> Self {
+        value.0
     }
 }
