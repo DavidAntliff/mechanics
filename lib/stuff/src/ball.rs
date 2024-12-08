@@ -1,5 +1,8 @@
+use bevy::ecs::schedule::Stepping;
 use bevy::math::Vec2;
-use bevy::prelude::{Component, Deref, DerefMut, Query, Res, Time, Transform, Window, With};
+use bevy::prelude::{
+    Component, Deref, DerefMut, Query, Res, ResMut, Time, Transform, Window, With,
+};
 
 #[derive(Component, Deref, DerefMut)]
 pub struct Velocity(pub Vec2);
@@ -42,6 +45,7 @@ pub fn ball_warp_system(mut query: Query<&mut Transform, With<Ball>>, window: Qu
 
 pub fn ball_collision_system(
     mut query: Query<(&mut Transform, &mut Velocity, &Mass), With<Ball>>,
+    mut stepping: ResMut<Stepping>,
     //    mut collision_events: EventWriter<CollisionEvent>,
 ) {
     let mut combinations = query.iter_combinations_mut();
@@ -60,6 +64,7 @@ pub fn ball_collision_system(
         if distance < r1 + r2 {
             // Collision detected
             //collision_events.send(CollisionEvent);
+            //stepping.enable();
 
             // Use conservation of momentum to calculate new velocities
             // https://en.wikipedia.org/wiki/Elastic_collision#Two-dimensional_collision_with_two_moving_objects
@@ -71,50 +76,55 @@ pub fn ball_collision_system(
             //     / (x2 - x1).length_squared()
             //     * (x2 - x1);
 
+            // Impulse model:
+            // https://en.wikipedia.org/wiki/Collision_response
+
             let collision_normal = (x2 - x1).normalize();
+            //dbg!(collision_normal);
 
             // resolve overlap
             let overlap = (r1 + r2) - distance;
             t1.translation -= (overlap / 2.0) * collision_normal.extend(0.0);
             t2.translation += (overlap / 2.0) * collision_normal.extend(0.0);
 
-            let v_normal = (v1.0 - v2.0).dot(x1 - x2);
-            if v_normal > 0.0 {
-                // Already moving apart
-                continue;
-            }
-
-            // let relative_velocity = (v1.0 - v2.0).dot(collision_normal);
-            // if relative_velocity > 0.0 {
+            // let v_normal = (v1.0 - v2.0).dot(x1 - x2);
+            // if v_normal > 0.0 {
             //     // Already moving apart
             //     continue;
             // }
 
-            let combined_mass = m1.0 + m2.0;
+            let relative_velocity = (v2.0 - v1.0).dot(collision_normal);
+            //dbg!(relative_velocity);
+            if relative_velocity > 0.0 {
+                // Already moving apart
+                continue;
+            }
 
-            // let e = 1.0; // Coefficient of restitution
-            // let inverse_mass_sum = (1.0 / m1.0) + (1.0 / m2.0);
-            //
-            // // Compute impulse
-            // let impulse = -(1.0 + e) * relative_velocity / inverse_mass_sum;
-            // let impulse_vector = impulse * collision_normal;
-            //
-            // v1.0 += impulse_vector / m1.0;
-            // v2.0 -= impulse_vector / m2.0;
+            let e = 0.5; // Coefficient of restitution
+            let inverse_mass_sum = (1.0 / m1.0) + (1.0 / m2.0);
 
+            // Compute impulse
+            let impulse = -(1.0 + e) * relative_velocity / inverse_mass_sum;
+            let impulse_vector = impulse * collision_normal;
+            //dbg!(impulse_vector);
+
+            v1.0 -= impulse_vector / m1.0;
+            v2.0 += impulse_vector / m2.0;
+
+            // let combined_mass = m1.0 + m2.0;
             // let w1 = (2.0 * m2.0) / combined_mass * e * relative_velocity * collision_normal;
             // let w2 = (2.0 * m1.0) / combined_mass * e * relative_velocity * collision_normal;
             //
             // v1.0 -= w1;
             // v2.0 += w2;
 
-            let w1 =
-                (2.0 * m2.0) / combined_mass * v_normal / (x1 - x2).length_squared() * (x1 - x2);
-            let w2 =
-                (2.0 * m1.0) / combined_mass * v_normal / (x2 - x1).length_squared() * (x2 - x1);
-
-            v1.0 -= w1;
-            v2.0 -= w2;
+            // let w1 =
+            //     (2.0 * m2.0) / combined_mass * v_normal / (x1 - x2).length_squared() * (x1 - x2);
+            // let w2 =
+            //     (2.0 * m1.0) / combined_mass * v_normal / (x2 - x1).length_squared() * (x2 - x1);
+            //
+            // v1.0 -= w1;
+            // v2.0 -= w2;
         }
     }
 }
