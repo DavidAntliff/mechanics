@@ -1,0 +1,21 @@
+[package]
+name = "smash"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+stuff.workspace = true
+bevy.workspace = true
+rand_core.workspace = true
+bevy_rand.workspace = true
+bevy_prng.workspace = true
+scarlet.workspace = true
+
+#[features]
+#stepping = ["stuff/stepping"]
+#
+#[profile.dev]
+#opt-level = 1
+#
+#[profile.dev.package."*"]
+#opt-level = 3

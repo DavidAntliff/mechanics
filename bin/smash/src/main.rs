@@ -25,6 +25,7 @@ struct BallDefaults {
 const DEFAULT_WINDOW_WIDTH: f32 = 600.0;
 const DEFAULT_WINDOW_HEIGHT: f32 = 600.0;
 
+//const NUM_BALLS: usize = 2000;
 const NUM_BALLS: usize = 2000;
 
 const SPEED_SCALING: f32 = 1.0; //20.0;
@@ -57,6 +58,7 @@ fn main() {
             LogDiagnosticsPlugin::default(),
         ))
         .add_systems(Startup, setup)
+        .add_systems(Update, (handle_input,))
         .add_systems(
             FixedUpdate,
             (
@@ -105,8 +107,8 @@ fn setup(
     let _half_width = window.single().width() / 2.0;
     let _half_height = window.single().height() / 2.0;
 
-    //let spawn_radius_max = 2.0 * _half_width / 3.0;
-    let spawn_radius_max = _half_width / 2.0;
+    let spawn_radius_max = 2.0 * _half_width / 3.0;
+    //let spawn_radius_max = _half_width / 2.0;
     let spawn_velocity_max = 100.0 * SPEED_SCALING;
 
     // Random Balls
@@ -131,6 +133,9 @@ fn setup(
         let spawn_direction = random_float(&mut rng) * std::f32::consts::PI * 2.0;
         let spawn_velocity_x = spawn_speed * spawn_direction.cos();
         let spawn_velocity_y = spawn_speed * spawn_direction.sin();
+
+        // TODO remove
+        let spawn_speed = 0.0;
 
         // let color = Color::srgb(
         //     random_float(&mut rng),
@@ -158,6 +163,50 @@ fn setup(
             speed: spawn_speed,
             initial_direction: Vec2::new(spawn_velocity_x, spawn_velocity_y),
             color: color.into(),
+        };
+
+        commands.spawn((
+            MaterialMesh2dBundle {
+                mesh: meshes.add(Circle::default()).into(),
+                material: materials.add(ball.color),
+                transform: Transform::from_translation(ball.starting_position)
+                    .with_scale(Vec2::splat(ball.diameter).extend(1.0)),
+                ..default()
+            },
+            Ball,
+            Velocity(ball.initial_direction.normalize() * ball.speed),
+            Mass(ball.mass),
+        ));
+    }
+}
+
+fn handle_input(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut rng: ResMut<GlobalEntropy<ChaCha8Rng>>,
+    window: Query<&Window>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Enter) {
+        let width = window.single().width();
+        let height = window.single().height();
+
+        let radius = 0.8 * f32::min(width, height) / 2.0;
+        let angle = random_float(&mut rng) * 2.0 * std::f32::consts::PI;
+        let spawn_x = radius * angle.cos();
+        let spawn_y = radius * angle.sin();
+        // dbg!(radius);
+        // dbg!(angle);
+        // dbg!((spawn_x, spawn_y));
+
+        let ball = BallDefaults {
+            starting_position: Vec3::new(spawn_x, spawn_y, 0.0),
+            diameter: 40.0,
+            mass: 20.0,
+            speed: 250.0 * SPEED_SCALING,
+            initial_direction: Vec2::new(-spawn_x, -spawn_y),
+            color: bevy::prelude::Color::srgb(1.0, 0.0, 0.0),
         };
 
         commands.spawn((
