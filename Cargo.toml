@@ -12,6 +12,7 @@ bevy_rand = "0.7.1"
 bevy_prng = { version = "0.7.1", features = ["rand_chacha"] }
 scarlet = "1.2.0"
 stuff = { path = "lib/stuff", features = ["stepping"] }
+clap = { version = "4.5.23", features = ["derive"] }
 
 #[workspace.features]
 #stepping = ["bevy/bevy_debug_stepping"]
