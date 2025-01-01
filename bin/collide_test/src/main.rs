@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::window::PresentMode;
 use stuff::ball::{
-    apply_velocity_system, ball_collision_system, ball_warp_system, Ball, Mass, Velocity,
+    apply_velocity_system, ball_warp_system, sweep_and_prune_collision_system, Ball, Mass, Velocity,
 };
 use stuff::stepping;
 
@@ -25,7 +25,7 @@ const SPEED_SCALING: f32 = 1.0; //20.0;
 const RADIUS: f32 = 10.0;
 const OFFSET: f32 = 0.7654 * RADIUS;
 
-const BALL_DEFAULTS: [BallDefaults; 4] = [
+const BALL_DEFAULTS: [BallDefaults; 6] = [
     // Horizontal collision
     BallDefaults {
         starting_position: Vec3::new(-100.0, 100.0, 0.0),
@@ -43,12 +43,29 @@ const BALL_DEFAULTS: [BallDefaults; 4] = [
         initial_direction: Vec2::new(-1.0, 0.0),
         color: Color::srgb(0.7, 0.6, 0.8),
     },
+    // Vertical collision
+    BallDefaults {
+        starting_position: Vec3::new(200.0, 150.0, 0.0),
+        diameter: 2.0 * RADIUS,
+        mass: 1.0,
+        speed: 100.0 * SPEED_SCALING,
+        initial_direction: Vec2::new(0.0, -1.0),
+        color: Color::srgb(0.8, 0.7, 0.6),
+    },
+    BallDefaults {
+        starting_position: Vec3::new(200.0, -150.0, 0.0),
+        diameter: 2.0 * RADIUS,
+        mass: 1.0,
+        speed: 100.0 * SPEED_SCALING,
+        initial_direction: Vec2::new(0.0, 1.0),
+        color: Color::srgb(0.7, 0.6, 0.8),
+    },
     // Offset collision
     BallDefaults {
         starting_position: Vec3::new(-100.0, -100.0 - OFFSET / 2.0, 0.0),
         diameter: 2.0 * RADIUS,
         mass: 1.0,
-        speed: 100.0 * SPEED_SCALING,
+        speed: 80.0 * SPEED_SCALING,
         initial_direction: Vec2::new(1.0, 0.0),
         color: Color::srgb(0.8, 0.7, 0.6),
     },
@@ -56,7 +73,7 @@ const BALL_DEFAULTS: [BallDefaults; 4] = [
         starting_position: Vec3::new(100.0, -100.0 + OFFSET / 2.0, 0.0),
         diameter: 2.0 * RADIUS,
         mass: 1.0,
-        speed: 100.0 * SPEED_SCALING,
+        speed: 80.0 * SPEED_SCALING,
         initial_direction: Vec2::new(-1.0, 0.0),
         color: Color::srgb(0.7, 0.6, 0.8),
     },
@@ -90,7 +107,8 @@ fn main() {
             FixedUpdate,
             (
                 apply_velocity_system,
-                ball_collision_system,
+                //naive_ball_collision_system,
+                sweep_and_prune_collision_system,
                 ball_warp_system,
             )
                 .chain(),

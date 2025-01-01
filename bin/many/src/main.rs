@@ -5,7 +5,8 @@ use bevy_rand::prelude::*;
 use scarlet::colormap::{ColorMap, GradientColorMap};
 use scarlet::prelude::*;
 use stuff::ball::{
-    apply_velocity_system, ball_collision_system, ball_warp_system, Ball, Mass, Velocity,
+    apply_velocity_system, ball_warp_system,
+    sweep_and_prune_collision_system, Ball, Mass, Velocity,
 };
 use stuff::my_color::MyColor;
 use stuff::random::random_float;
@@ -19,11 +20,12 @@ struct BallDefaults {
     color: bevy::color::Color,
 }
 
-const DEFAULT_WINDOW_WIDTH: f32 = 600.0;
-const DEFAULT_WINDOW_HEIGHT: f32 = 600.0;
+const DEFAULT_WINDOW_WIDTH: f32 = 1920.0;
+const DEFAULT_WINDOW_HEIGHT: f32 = 1080.0;
 
+// Naive collision detection:
 // Performance on MBP M4Pro (on AC power) goes off a cliff around 2750 balls:
-//   2500: 113 fps
+//   2500: 115 fps  @ 600x600
 //   2725: 63 fps
 //   2730: 62 fps
 //   2740: 61 fps
@@ -32,8 +34,17 @@ const DEFAULT_WINDOW_HEIGHT: f32 = 600.0;
 //   2770: 51 fps
 //   2780: 39 fps
 //   2800: 27 fps
-// Does not seem to be a GPU limitation, as triangles render in the same time as circles.
-const NUM_BALLS: usize = 2500;
+//   4000: 3.3 fps
+//  10000: 0.7 fps  @ 1920x1080
+//
+// Sweep-and-prune collision detection:
+//   2500: 190 fps  @ 600x600
+//   2800: 170 fps
+//   4000: 115 fps
+//  10000: 38 fps   @ 1920x1080
+//
+// Does not seem to be GPU limited, as triangles render in the same time as circles
+const NUM_BALLS: usize = 10000;
 
 const SPEED_SCALING: f32 = 1.0; //20.0;
 
@@ -46,7 +57,8 @@ fn main() {
         FixedUpdate,
         (
             apply_velocity_system,
-            ball_collision_system,
+            //naive_ball_collision_system,
+            sweep_and_prune_collision_system,
             ball_warp_system,
         )
             .chain(),

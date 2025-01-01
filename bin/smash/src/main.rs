@@ -5,7 +5,7 @@ use bevy_rand::prelude::*;
 use scarlet::colormap::{ColorMap, GradientColorMap};
 use scarlet::prelude::*;
 use stuff::ball::{
-    apply_velocity_system, ball_collision_system, ball_warp_system, Ball, Mass, Velocity,
+    apply_velocity_system, ball_warp_system, naive_ball_collision_system, Ball, Mass, Velocity,
 };
 use stuff::my_color::MyColor;
 use stuff::random::random_float;
@@ -38,7 +38,7 @@ fn main() {
             FixedUpdate,
             (
                 apply_velocity_system,
-                ball_collision_system,
+                naive_ball_collision_system,
                 ball_warp_system,
             )
                 .chain(),
