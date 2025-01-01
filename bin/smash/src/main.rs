@@ -1,7 +1,5 @@
-use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
-use bevy::window::PresentMode;
 use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
 use scarlet::colormap::{ColorMap, GradientColorMap};
@@ -11,7 +9,6 @@ use stuff::ball::{
 };
 use stuff::my_color::MyColor;
 use stuff::random::random_float;
-use stuff::stepping;
 
 struct BallDefaults {
     starting_position: Vec3,
@@ -31,33 +28,11 @@ const NUM_BALLS: usize = 2000;
 const SPEED_SCALING: f32 = 1.0; //20.0;
 
 fn main() {
-    let seed = [0u8; 32];
+    let cli = stuff::cli::parse_command_line_options();
 
-    App::new()
-        // Disable VSYNC
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                // Turn off vsync to maximize CPU/GPU usage
-                present_mode: PresentMode::AutoNoVsync,
-                ..default()
-            }),
-            ..default()
-        }))
-        // Enable stepping when compiled with '--features=bevy_debug_stepping'
-        .add_plugins(
-            stepping::SteppingPlugin::default()
-                .add_schedule(Update)
-                .add_schedule(FixedUpdate)
-                .at(Val::Percent(35.0), Val::Percent(50.0)),
-        )
-        // See the random number generator
-        .add_plugins(EntropyPlugin::<ChaCha8Rng>::with_seed(seed))
-        // Add diagnostics
-        .add_plugins((
-            FrameTimeDiagnosticsPlugin::default(),
-            LogDiagnosticsPlugin::default(),
-        ))
-        .add_systems(Startup, setup)
+    let mut app = stuff::setup::setup(&cli);
+
+    app.add_systems(Startup, setup)
         .add_systems(Update, (handle_input,))
         .add_systems(
             FixedUpdate,
@@ -67,8 +42,9 @@ fn main() {
                 ball_warp_system,
             )
                 .chain(),
-        )
-        .run();
+        );
+
+    app.run();
 }
 
 #[derive(Component)]

@@ -1,8 +1,5 @@
-use bevy::ecs::schedule::Stepping;
 use bevy::math::Vec2;
-use bevy::prelude::{
-    Component, Deref, DerefMut, Query, Res, ResMut, Time, Transform, Window, With,
-};
+use bevy::prelude::{Component, Deref, DerefMut, Query, Res, Time, Transform, Window, With};
 
 #[derive(Component, Deref, DerefMut)]
 pub struct Velocity(pub Vec2);
@@ -15,9 +12,14 @@ pub struct Ball;
 
 // Systems
 pub fn apply_velocity_system(mut query: Query<(&mut Transform, &Velocity)>, time: Res<Time>) {
+    // In FixedUpdate context, time.delta_seconds() is the fixed time step.
+    // https://bevy-cheatbook.github.io/fundamentals/fixed-timestep.html
+
+    // First-order explicit Euler update
     for (mut transform, velocity) in &mut query {
-        transform.translation.x += velocity.x * time.delta_seconds();
-        transform.translation.y += velocity.y * time.delta_seconds();
+        transform.translation += velocity.0.extend(0.0) * time.delta_seconds();
+        // transform.translation.x += velocity.x * time.delta_seconds();
+        // transform.translation.y += velocity.y * time.delta_seconds();
     }
 }
 
@@ -45,8 +47,8 @@ pub fn ball_warp_system(mut query: Query<&mut Transform, With<Ball>>, window: Qu
 
 pub fn ball_collision_system(
     mut query: Query<(&mut Transform, &mut Velocity, &Mass), With<Ball>>,
-    mut stepping: ResMut<Stepping>,
-    //    mut collision_events: EventWriter<CollisionEvent>,
+    //mut stepping: ResMut<Stepping>,
+    //mut collision_events: EventWriter<CollisionEvent>,
 ) {
     let mut combinations = query.iter_combinations_mut();
 

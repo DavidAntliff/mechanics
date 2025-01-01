@@ -3859,6 +3859,7 @@ dependencies = [
  "bevy",
  "bevy_prng",
  "bevy_rand",
+ "clap",
  "rand_core",
  "scarlet",
 ]

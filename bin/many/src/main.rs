@@ -1,10 +1,7 @@
-use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
-use bevy::window::PresentMode;
 use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
-use clap::Parser;
 use scarlet::colormap::{ColorMap, GradientColorMap};
 use scarlet::prelude::*;
 use stuff::ball::{
@@ -12,7 +9,6 @@ use stuff::ball::{
 };
 use stuff::my_color::MyColor;
 use stuff::random::random_float;
-use stuff::stepping;
 
 struct BallDefaults {
     starting_position: Vec3,
@@ -26,75 +22,35 @@ struct BallDefaults {
 const DEFAULT_WINDOW_WIDTH: f32 = 600.0;
 const DEFAULT_WINDOW_HEIGHT: f32 = 600.0;
 
-const NUM_BALLS: usize = 2000;
+// Performance on MBP M4Pro (on AC power) goes off a cliff around 2750 balls:
+//   2500: 113 fps
+//   2725: 63 fps
+//   2730: 62 fps
+//   2740: 61 fps
+//   2750: 57 fps
+//   2760: 53 fps
+//   2770: 51 fps
+//   2780: 39 fps
+//   2800: 27 fps
+// Does not seem to be a GPU limitation, as triangles render in the same time as circles.
+const NUM_BALLS: usize = 2500;
 
 const SPEED_SCALING: f32 = 1.0; //20.0;
 
-#[derive(Parser)]
-pub struct Cli {
-    #[arg(short = 't', long = "time", value_name = "SECONDS")]
-    duration: Option<f64>,
-
-    #[arg(short = 'f', long = "frames", value_name = "FRAMES")]
-    frames: Option<f64>,
-}
-
-#[derive(Resource)]
-struct BenchmarkTargets {
-    duration: Option<f64>,
-    frame_count: Option<f64>,
-}
-
 fn main() {
-    let cli = Cli::parse();
-    let seed = [0u8; 32];
+    let cli = stuff::cli::parse_command_line_options();
 
-    let mut app = App::new();
-    app
-        // Disable VSYNC
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                // Turn off vsync to maximize CPU/GPU usage
-                present_mode: PresentMode::AutoNoVsync,
-                ..default()
-            }),
-            ..default()
-        }))
-        // Enable stepping when compiled with '--features=bevy_debug_stepping'
-        .add_plugins(
-            stepping::SteppingPlugin::default()
-                .add_schedule(Update)
-                .add_schedule(FixedUpdate)
-                .at(Val::Percent(35.0), Val::Percent(50.0)),
+    let mut app = stuff::setup::setup(&cli);
+
+    app.add_systems(Startup, setup).add_systems(
+        FixedUpdate,
+        (
+            apply_velocity_system,
+            ball_collision_system,
+            ball_warp_system,
         )
-        // See the random number generator
-        .add_plugins(EntropyPlugin::<ChaCha8Rng>::with_seed(seed))
-        // Add diagnostics
-        .add_plugins((
-            FrameTimeDiagnosticsPlugin::default(),
-            LogDiagnosticsPlugin::default(),
-        ))
-        .add_systems(Startup, setup)
-        .add_systems(
-            FixedUpdate,
-            (
-                apply_velocity_system,
-                ball_collision_system,
-                ball_warp_system,
-            )
-                .chain(),
-        );
-
-    match (cli.duration, cli.frames) {
-        (None, None) => (),
-        (duration, frame_count) => {
-            app.insert_resource(BenchmarkTargets {
-                duration,
-                frame_count,
-            });
-            app.add_systems(Update, run_benchmark);
-        }
-    }
+            .chain(),
+    );
 
     app.run();
 }
@@ -164,9 +120,9 @@ fn setup(
 
 fn spawn_random_ball(
     commands: &mut Commands,
-    mut meshes: &mut ResMut<Assets<Mesh>>,
-    mut materials: &mut ResMut<Assets<ColorMaterial>>,
-    mut rng: &mut ResMut<GlobalEntropy<ChaCha8Rng>>,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<ColorMaterial>>,
+    rng: &mut ResMut<GlobalEntropy<ChaCha8Rng>>,
     half_width: f32,
     half_height: f32,
     color_map: &GradientColorMap<RGBColor>,
@@ -191,7 +147,9 @@ fn spawn_random_ball(
     let spawn_velocity_x = spawn_speed * spawn_direction.cos();
     let spawn_velocity_y = spawn_speed * spawn_direction.sin();
 
-    let color: MyColor = color_map.transform_single(spawn_vec.length() as f64).into();
+    let color: MyColor = color_map
+        .transform_single(radius_transform(spawn_vec.length(), 0.9) as f64)
+        .into();
 
     let ball = BallDefaults {
         starting_position: Vec3::new(spawn_region_x, spawn_region_y, 0.0),
@@ -205,6 +163,7 @@ fn spawn_random_ball(
     commands.spawn((
         MaterialMesh2dBundle {
             mesh: meshes.add(Circle::default()).into(),
+            //mesh: meshes.add(Triangle2d::default()).into(),
             material: materials.add(ball.color),
             transform: Transform::from_translation(ball.starting_position)
                 .with_scale(Vec2::splat(ball.diameter).extend(1.0)),
@@ -214,49 +173,4 @@ fn spawn_random_ball(
         Velocity(ball.initial_direction.normalize() * ball.speed),
         Mass(ball.mass),
     ));
-}
-
-pub fn run_benchmark(
-    diagnostics: Res<DiagnosticsStore>,
-    time: Res<Time<Real>>,
-    targets: Res<BenchmarkTargets>,
-) {
-    if let Some(frame_count) = diagnostics
-        .get(&FrameTimeDiagnosticsPlugin::FRAME_COUNT)
-        .and_then(|diagnostic| diagnostic.value())
-    {
-        let duration = time.elapsed_seconds_f64();
-
-        match *targets {
-            BenchmarkTargets {
-                duration: Some(duration_target),
-                frame_count: None,
-            } => {
-                if duration >= duration_target {
-                    println!(
-                        "Stopping the app at {:.2} seconds after {:.0} frames, {:.2} fps",
-                        duration,
-                        frame_count,
-                        frame_count / duration
-                    );
-                    std::process::exit(0);
-                }
-            }
-            BenchmarkTargets {
-                duration: None,
-                frame_count: Some(frames_target),
-            } => {
-                if frame_count >= frames_target {
-                    println!(
-                        "Stopping the app at {:.2} seconds after {:.0} frames, {:.2} fps",
-                        duration,
-                        frame_count,
-                        frame_count / duration
-                    );
-                    std::process::exit(0);
-                }
-            }
-            _ => {}
-        }
-    }
 }

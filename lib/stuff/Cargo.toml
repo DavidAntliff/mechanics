@@ -12,3 +12,4 @@ rand_core.workspace = true
 bevy_rand.workspace = true
 bevy_prng.workspace = true
 scarlet.workspace = true
+clap = { version = "4.5.23", features = ["derive"] }
