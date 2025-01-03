@@ -10,6 +10,7 @@ bevy = { version = "0.14.2", features = ["dynamic_linking"] }
 rand_core = "0.6.4"
 bevy_rand = "0.7.1"
 bevy_prng = { version = "0.7.1", features = ["rand_chacha"] }
+bevy_app = "0.14.2"
 scarlet = "1.2.0"
 stuff = { path = "lib/stuff", features = ["stepping"] }
 clap = { version = "4.5.23", features = ["derive"] }

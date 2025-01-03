@@ -9,6 +9,7 @@ stepping = ["bevy/bevy_debug_stepping"]
 [dependencies]
 bevy.workspace = true
 rand_core.workspace = true
+bevy_app.workspace = true
 bevy_rand.workspace = true
 bevy_prng.workspace = true
 scarlet.workspace = true

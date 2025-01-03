@@ -4,8 +4,9 @@ use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
 use scarlet::colormap::{ColorMap, GradientColorMap};
 use scarlet::prelude::*;
+#[allow(unused_imports)]
 use stuff::ball::{
-    apply_velocity_system, ball_warp_system,
+    apply_velocity_system, ball_warp_system, naive_ball_collision_system,
     sweep_and_prune_collision_system, Ball, Mass, Velocity,
 };
 use stuff::my_color::MyColor;

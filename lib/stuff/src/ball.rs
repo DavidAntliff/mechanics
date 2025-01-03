@@ -1,5 +1,7 @@
 use bevy::math::Vec2;
-use bevy::prelude::{Component, Deref, DerefMut, Query, Res, Time, Transform, Window, With};
+use bevy::prelude::{
+    Component, Deref, DerefMut, Query, Res, ResMut, Resource, Time, Transform, Window, With,
+};
 
 #[derive(Component, Deref, DerefMut)]
 pub struct Velocity(pub Vec2);
@@ -9,6 +11,11 @@ pub struct Mass(pub f32);
 
 #[derive(Component)]
 pub struct Ball;
+
+#[derive(Resource, Default)]
+pub struct Stats {
+    pub num_collisions: usize,
+}
 
 // Systems
 pub fn apply_velocity_system(mut query: Query<(&mut Transform, &Velocity)>, time: Res<Time>) {
@@ -47,6 +54,7 @@ pub fn ball_warp_system(mut query: Query<&mut Transform, With<Ball>>, window: Qu
 
 pub fn naive_ball_collision_system(
     mut query: Query<(&mut Transform, &mut Velocity, &Mass), With<Ball>>,
+    mut stats: ResMut<Stats>,
 ) {
     // Naive O(n^2) collision detection, comparing every particle with every other particle
     let mut combinations = query.iter_combinations_mut();
@@ -65,12 +73,14 @@ pub fn naive_ball_collision_system(
         if distance < r1 + r2 {
             // Collision detected
             perform_collision(&mut t1, &mut v1, m1, &mut t2, &mut v2, m2);
+            stats.num_collisions += 1;
         }
     }
 }
 
 pub fn sweep_and_prune_collision_system(
     mut query: Query<(&mut Transform, &mut Velocity, &Mass), With<Ball>>,
+    mut stats: ResMut<Stats>,
 ) {
     // Sweep and prune collision detection
     // https://leanrada.com/notes/sweep-and-prune/
@@ -111,6 +121,7 @@ pub fn sweep_and_prune_collision_system(
             let distance = x1.distance(x2);
             if distance < r1 + r2 {
                 perform_collision(t1, v1, m1, t2, v2, m2);
+                stats.num_collisions += 1;
             }
         }
     }

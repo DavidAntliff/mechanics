@@ -3857,6 +3857,7 @@ name = "stuff"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_app",
  "bevy_prng",
  "bevy_rand",
  "clap",
