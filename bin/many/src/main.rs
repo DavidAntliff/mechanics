@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
+use clap::Parser;
 use scarlet::colormap::{ColorMap, GradientColorMap};
 use scarlet::prelude::*;
 #[allow(unused_imports)]
@@ -21,8 +22,8 @@ struct BallDefaults {
     color: bevy::color::Color,
 }
 
-const DEFAULT_WINDOW_WIDTH: f32 = 1920.0;
-const DEFAULT_WINDOW_HEIGHT: f32 = 1080.0;
+const DEFAULT_WINDOW_WIDTH: f32 = 800.0;
+const DEFAULT_WINDOW_HEIGHT: f32 = 600.0;
 
 // Naive collision detection:
 // Performance on MBP M4Pro (on AC power) goes off a cliff around 2750 balls:
@@ -45,14 +46,25 @@ const DEFAULT_WINDOW_HEIGHT: f32 = 1080.0;
 //  10000: 38 fps   @ 1920x1080
 //
 // Does not seem to be GPU limited, as triangles render in the same time as circles
-const NUM_BALLS: usize = 10000;
+const DEFAULT_NUM_BALLS: usize = 10000;
 
 const SPEED_SCALING: f32 = 1.0; //20.0;
 
-fn main() {
-    let cli = stuff::cli::parse_command_line_options();
+#[derive(Parser, Resource)]
+pub struct Cli {
+    #[clap(flatten)]
+    pub common: stuff::cli::Cli,
 
-    let mut app = stuff::setup::setup(&cli);
+    #[clap(short, long, default_value_t = DEFAULT_NUM_BALLS)]
+    num_balls: usize,
+}
+
+fn main() {
+    let cli = Cli::parse();
+
+    let mut app = stuff::setup::setup(&cli.common);
+
+    app.insert_resource(cli);
 
     app.add_systems(Startup, setup).add_systems(
         FixedUpdate,
@@ -82,6 +94,7 @@ fn setup(
     mut rng: ResMut<GlobalEntropy<ChaCha8Rng>>,
     mut window: Query<&mut Window>,
     _asset_server: Res<AssetServer>,
+    cli: Res<Cli>,
 ) {
     window
         .single_mut()
@@ -118,7 +131,7 @@ fn setup(
     );
 
     // Random Balls
-    for _ in 0..NUM_BALLS {
+    for _ in 0..cli.num_balls {
         spawn_random_ball(
             &mut commands,
             &mut meshes,

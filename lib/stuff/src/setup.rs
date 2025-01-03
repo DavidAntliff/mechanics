@@ -13,7 +13,11 @@ use bevy_rand::plugin::EntropyPlugin;
 
 /// Common setup
 pub fn setup(cli: &Cli) -> App {
-    let seed = [0u8; 32];
+    // Construct seed
+    let x = cli.global_opts.seed.to_le_bytes();
+    let mut seed = [0u8; 32];
+    seed[..x.len()].copy_from_slice(&x);
+
     let mut app = App::new();
     app
         // Disable VSYNC

@@ -22,6 +22,9 @@ pub struct GlobalOpts {
         default_value_t = 64f64
     )]
     pub(crate) physics_rate: f64, // Hz
+
+    #[clap(long, short, global = true, default_value_t = 0)]
+    pub(crate) seed: u64,
 }
 
 #[derive(Debug, Subcommand)]
