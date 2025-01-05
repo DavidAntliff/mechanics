@@ -1470,11 +1470,7 @@ name = "collide_test"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy_prng",
- "bevy_rand",
  "clap",
- "rand_core",
- "scarlet",
  "stuff",
 ]
 
@@ -2624,7 +2620,6 @@ dependencies = [
  "bevy_prng",
  "bevy_rand",
  "clap",
- "rand_core",
  "scarlet",
  "stuff",
 ]
@@ -3803,6 +3798,7 @@ dependencies = [
  "bevy",
  "bevy_prng",
  "bevy_rand",
+ "clap",
  "rand_core",
  "scarlet",
  "stuff",

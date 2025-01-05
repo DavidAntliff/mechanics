@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use clap::Parser;
+use stuff::ball::sweep_and_prune_collision_system_with_cache;
 #[allow(unused_imports)]
 use stuff::ball::{
     apply_velocity_system, ball_warp_system, sweep_and_prune_collision_system,
@@ -97,7 +98,12 @@ fn main() {
         (
             apply_velocity_system,
             //naive_ball_collision_system,
-            (update_sorted_balls_cache, sweep_and_prune_collision_system).chain(),
+            //sweep_and_prune_collision_system,
+            (
+                update_sorted_balls_cache,
+                sweep_and_prune_collision_system_with_cache,
+            )
+                .chain(),
             ball_warp_system,
         )
             .chain(),
@@ -108,10 +114,6 @@ fn main() {
 
 #[derive(Component)]
 struct MyCamera;
-
-fn radius_transform(u: f32, n: f32) -> f32 {
-    u.powf(1.0 / n)
-}
 
 fn setup(
     mut commands: Commands,

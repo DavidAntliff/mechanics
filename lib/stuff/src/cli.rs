@@ -19,7 +19,7 @@ pub struct GlobalOpts {
         long = "physics-rate",
         short = 'p',
         global = true,
-        default_value_t = 64f64
+        default_value_t = 128f64
     )]
     pub(crate) physics_rate: f64, // Hz
 

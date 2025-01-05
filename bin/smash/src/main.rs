@@ -2,11 +2,14 @@ use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy_prng::ChaCha8Rng;
 use bevy_rand::prelude::*;
+use clap::Parser;
 use scarlet::colormap::{ColorMap, GradientColorMap};
 use scarlet::prelude::*;
+#[allow(unused_imports)]
 use stuff::ball::{
-    apply_velocity_system, ball_warp_system,
-    sweep_and_prune_collision_system, Ball, Mass, Velocity,
+    apply_velocity_system, ball_warp_system, naive_ball_collision_system,
+    sweep_and_prune_collision_system, sweep_and_prune_collision_system_with_cache,
+    update_sorted_balls_cache, Ball, Mass, Velocity,
 };
 use stuff::my_color::MyColor;
 use stuff::random::random_float;
@@ -20,18 +23,27 @@ struct BallDefaults {
     color: bevy::color::Color,
 }
 
-const DEFAULT_WINDOW_WIDTH: f32 = 600.0;
+const DEFAULT_WINDOW_WIDTH: f32 = 800.0;
 const DEFAULT_WINDOW_HEIGHT: f32 = 600.0;
 
 //const NUM_BALLS: usize = 2000;
-const NUM_BALLS: usize = 2000;
+const DEFAULT_NUM_BALLS: usize = 2000;
 
 const SPEED_SCALING: f32 = 1.0; //20.0;
 
-fn main() {
-    let cli = stuff::cli::parse_command_line_options();
+#[derive(Parser, Resource)]
+pub struct Cli {
+    #[clap(flatten)]
+    pub common: stuff::cli::Cli,
 
-    let mut app = stuff::setup::setup(&cli);
+    #[clap(short, long, default_value_t = DEFAULT_NUM_BALLS)]
+    num_balls: usize,
+}
+
+fn main() {
+    let cli = Cli::parse();
+    let mut app = stuff::setup::setup(&cli.common);
+    app.insert_resource(cli);
 
     app.add_systems(Startup, setup)
         .add_systems(Update, (handle_input,))
@@ -40,7 +52,12 @@ fn main() {
             (
                 apply_velocity_system,
                 //naive_ball_collision_system,
-                sweep_and_prune_collision_system,
+                //sweep_and_prune_collision_system,
+                (
+                    update_sorted_balls_cache,
+                    sweep_and_prune_collision_system_with_cache,
+                )
+                    .chain(),
                 ball_warp_system,
             )
                 .chain(),
@@ -63,6 +80,7 @@ fn setup(
     mut rng: ResMut<GlobalEntropy<ChaCha8Rng>>,
     mut window: Query<&mut Window>,
     _asset_server: Res<AssetServer>,
+    cli: Res<Cli>,
 ) {
     window
         .single_mut()
@@ -86,11 +104,10 @@ fn setup(
     let _half_height = window.single().height() / 2.0;
 
     let spawn_radius_max = 2.0 * _half_width / 3.0;
-    //let spawn_radius_max = _half_width / 2.0;
     let spawn_velocity_max = 100.0 * SPEED_SCALING;
 
     // Random Balls
-    for _ in 0..NUM_BALLS {
+    for _ in 0..cli.num_balls {
         let max_radius = 5.0;
         let min_radius = 2.5;
         let radius_param = random_float(&mut rng);
@@ -115,11 +132,6 @@ fn setup(
         // TODO remove
         let spawn_speed = 0.0;
 
-        // let color = Color::srgb(
-        //     random_float(&mut rng),
-        //     random_float(&mut rng),
-        //     random_float(&mut rng),
-        // );
         let color_map = GradientColorMap::new_linear(
             RGBColor {
                 r: 1.0,
@@ -170,7 +182,7 @@ fn handle_input(
         let width = window.single().width();
         let height = window.single().height();
 
-        let radius = 0.8 * f32::min(width, height) / 2.0;
+        let radius = 1.2 * f32::min(width, height) / 2.0;
         let angle = random_float(&mut rng) * 2.0 * std::f32::consts::PI;
         let spawn_x = radius * angle.cos();
         let spawn_y = radius * angle.sin();
@@ -181,7 +193,7 @@ fn handle_input(
         let ball = BallDefaults {
             starting_position: Vec3::new(spawn_x, spawn_y, 0.0),
             diameter: 40.0,
-            mass: 20.0,
+            mass: 10.0,
             speed: 250.0 * SPEED_SCALING,
             initial_direction: Vec2::new(-spawn_x, -spawn_y),
             color: bevy::prelude::Color::srgb(1.0, 0.0, 0.0),

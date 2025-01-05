@@ -24,7 +24,8 @@ pub fn setup(cli: &Cli) -> App {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 // Turn off vsync to maximize CPU/GPU usage
-                present_mode: PresentMode::AutoNoVsync,
+                //present_mode: PresentMode::AutoNoVsync,
+                present_mode: PresentMode::AutoVsync,
                 ..default()
             }),
             ..default()
