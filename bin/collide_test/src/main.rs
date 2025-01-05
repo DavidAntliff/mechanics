@@ -1,10 +1,11 @@
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
-use bevy::window::PresentMode;
+use clap::Parser;
+#[allow(unused_imports)]
 use stuff::ball::{
-    apply_velocity_system, ball_warp_system, sweep_and_prune_collision_system, Ball, Mass, Velocity,
+    apply_velocity_system, ball_warp_system, sweep_and_prune_collision_system,
+    update_sorted_balls_cache, Ball, Mass, Velocity,
 };
-use stuff::stepping;
 
 struct BallDefaults {
     starting_position: Vec3,
@@ -43,7 +44,7 @@ const BALL_DEFAULTS: [BallDefaults; 6] = [
         initial_direction: Vec2::new(-1.0, 0.0),
         color: Color::srgb(0.7, 0.6, 0.8),
     },
-    // Vertical collision
+    // // Vertical collision
     BallDefaults {
         starting_position: Vec3::new(200.0, 150.0, 0.0),
         diameter: 2.0 * RADIUS,
@@ -79,41 +80,30 @@ const BALL_DEFAULTS: [BallDefaults; 6] = [
     },
 ];
 
+#[derive(Parser, Resource)]
+pub struct Cli {
+    #[clap(flatten)]
+    pub common: stuff::cli::Cli,
+}
+
 fn main() {
-    App::new()
-        // Disable VSYNC
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                // Turn off vsync to maximize CPU/GPU usage
-                present_mode: PresentMode::AutoNoVsync,
-                ..default()
-            }),
-            ..default()
-        }))
-        // Enable stepping when compiled with '--features=bevy_debug_stepping'
-        .add_plugins(
-            stepping::SteppingPlugin::default()
-                .add_schedule(Update)
-                .add_schedule(FixedUpdate)
-                .at(Val::Percent(35.0), Val::Percent(50.0)),
+    let cli = Cli::parse();
+
+    let mut app = stuff::setup::setup(&cli.common);
+    app.insert_resource(cli);
+
+    app.add_systems(Startup, setup).add_systems(
+        FixedUpdate,
+        (
+            apply_velocity_system,
+            //naive_ball_collision_system,
+            (update_sorted_balls_cache, sweep_and_prune_collision_system).chain(),
+            ball_warp_system,
         )
-        // // Add diagnostics
-        // .add_plugins((
-        //     FrameTimeDiagnosticsPlugin::default(),
-        //     LogDiagnosticsPlugin::default(),
-        // ))
-        .add_systems(Startup, setup)
-        .add_systems(
-            FixedUpdate,
-            (
-                apply_velocity_system,
-                //naive_ball_collision_system,
-                sweep_and_prune_collision_system,
-                ball_warp_system,
-            )
-                .chain(),
-        )
-        .run();
+            .chain(),
+    );
+
+    app.run();
 }
 
 #[derive(Component)]

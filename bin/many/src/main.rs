@@ -8,7 +8,8 @@ use scarlet::prelude::*;
 #[allow(unused_imports)]
 use stuff::ball::{
     apply_velocity_system, ball_warp_system, naive_ball_collision_system,
-    sweep_and_prune_collision_system, Ball, Mass, Velocity,
+    sweep_and_prune_collision_system, sweep_and_prune_collision_system_with_cache,
+    update_sorted_balls_cache, Ball, Mass, Velocity,
 };
 use stuff::my_color::MyColor;
 use stuff::random::random_float;
@@ -22,9 +23,11 @@ struct BallDefaults {
     color: bevy::color::Color,
 }
 
-const DEFAULT_WINDOW_WIDTH: f32 = 800.0;
-const DEFAULT_WINDOW_HEIGHT: f32 = 600.0;
+const DEFAULT_WINDOW_WIDTH: f32 = 1920.0;
+const DEFAULT_WINDOW_HEIGHT: f32 = 1080.0;
 
+// 1,000 balls, seed = 0, 500 fixed frames @ 1920x1080 = 2,003 collisions
+//
 // Naive collision detection:
 // Performance on MBP M4Pro (on AC power) goes off a cliff around 2750 balls:
 //   2500: 115 fps  @ 600x600
@@ -63,7 +66,6 @@ fn main() {
     let cli = Cli::parse();
 
     let mut app = stuff::setup::setup(&cli.common);
-
     app.insert_resource(cli);
 
     app.add_systems(Startup, setup).add_systems(
@@ -71,7 +73,12 @@ fn main() {
         (
             apply_velocity_system,
             //naive_ball_collision_system,
-            sweep_and_prune_collision_system,
+            //sweep_and_prune_collision_system,
+            (
+                update_sorted_balls_cache,
+                sweep_and_prune_collision_system_with_cache,
+            )
+                .chain(),
             ball_warp_system,
         )
             .chain(),

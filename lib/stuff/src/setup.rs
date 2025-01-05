@@ -1,4 +1,4 @@
-use crate::ball::Stats;
+use crate::ball::{SortedBallsCache, Stats};
 use crate::benchmark::{run_benchmark, BenchmarkTargets};
 use crate::cli::{Cli, Command};
 use crate::fixed_frame_count_diagnostics_plugin::FixedFrameCountDiagnosticsPlugin;
@@ -66,5 +66,6 @@ pub fn setup(cli: &Cli) -> App {
 
     app.insert_resource(Stats::default());
 
+    app.insert_resource(SortedBallsCache::default());
     app
 }

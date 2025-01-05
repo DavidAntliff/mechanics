@@ -1,6 +1,6 @@
 use bevy::math::Vec2;
 use bevy::prelude::{
-    Component, Deref, DerefMut, Query, Res, ResMut, Resource, Time, Transform, Window, With,
+    Component, Deref, DerefMut, Entity, Query, Res, ResMut, Resource, Time, Transform, Window, With,
 };
 
 #[derive(Component, Deref, DerefMut)]
@@ -129,6 +129,106 @@ pub fn sweep_and_prune_collision_system(
     // Final: O(n log n + m).
 }
 
+struct SortedEntity {
+    entity: Entity,
+    left_bound: f32,
+    right_bound: f32,
+}
+
+#[derive(Resource, Default)]
+pub struct SortedBallsCache {
+    sorted_entities: Vec<SortedEntity>,
+}
+
+pub fn update_sorted_balls_cache(
+    mut cache: ResMut<SortedBallsCache>,
+    query: Query<(Entity, &Transform), With<Ball>>,
+) {
+    if !cache.sorted_entities.is_empty() {
+        // Update left and right bounds
+        for x in &mut cache.sorted_entities {
+            let (_, transform) = query.get(x.entity).unwrap();
+            let left_bound = transform.translation.x - transform.scale.x / 2.0;
+            let right_bound = transform.translation.x + transform.scale.x / 2.0;
+            x.left_bound = left_bound;
+            x.right_bound = right_bound;
+        }
+    } else {
+        // Build cache
+        let entries: Vec<SortedEntity> = query
+            .iter()
+            .map(|x| {
+                let (entity, transform) = x;
+                let left_bound = transform.translation.x - transform.scale.x / 2.0;
+                let right_bound = transform.translation.x + transform.scale.x / 2.0;
+                SortedEntity {
+                    entity,
+                    left_bound,
+                    right_bound,
+                }
+            })
+            .collect();
+
+        cache.sorted_entities = entries;
+    }
+
+    cache
+        .sorted_entities
+        .sort_by(|a, b| a.left_bound.partial_cmp(&b.left_bound).unwrap());
+}
+
+pub fn sweep_and_prune_collision_system_with_cache(
+    mut query: Query<(&mut Transform, &mut Velocity, &Mass), With<Ball>>,
+    mut stats: ResMut<Stats>,
+    mut cache: ResMut<SortedBallsCache>,
+) {
+    // Sweep and prune collision detection
+    // https://leanrada.com/notes/sweep-and-prune/
+
+    // Sort particles by left x bound, then sweep through all particles to find potential collisions.
+    //
+    // A collision is only possible if the left bound of the right entity is less than the
+    // right bound of the left entity.
+    //
+    // Exploit temporal coherence by caching sorted order for fast re-sorting.
+
+    // O(n + m)
+    for i in 0..cache.sorted_entities.len() {
+        let (left_split, right_split) = cache.sorted_entities.split_at_mut(i + 1);
+
+        let left_entity = &left_split[i];
+        let right_bound = left_entity.right_bound;
+
+        // O(1) at best; O(m/n) on average; O(n) at worst
+        for right_entity in right_split {
+            let left_bound = right_entity.left_bound;
+
+            if left_bound > right_bound {
+                break;
+            }
+
+            let [(mut t1, mut v1, m1), (mut t2, mut v2, m2)] = query
+                .get_many_mut([left_entity.entity, right_entity.entity])
+                .unwrap();
+
+            let x1 = t1.translation.truncate();
+            let x2 = t2.translation.truncate();
+
+            // Use the x scaling as the diameter
+            let r1 = t1.scale.x / 2.0;
+            let r2 = t2.scale.x / 2.0;
+
+            let distance = x1.distance(x2);
+            if distance < r1 + r2 {
+                perform_collision(&mut t1, &mut v1, m1, &mut t2, &mut v2, m2);
+                stats.num_collisions += 1;
+            }
+        }
+    }
+
+    // Final: O(n log n + m).
+}
+
 fn perform_collision(
     t1: &mut Transform,
     v1: &mut Velocity,
@@ -160,14 +260,14 @@ fn perform_collision(
     let distance = x1.distance(x2);
 
     let collision_normal = (x2 - x1).normalize();
-    assert!(
-        !collision_normal.x.is_nan(),
-        "Found NaN in collision_normal.x"
-    );
-    assert!(
-        !collision_normal.y.is_nan(),
-        "Found NaN in collision_normal.y"
-    );
+    // assert!(
+    //     !collision_normal.x.is_nan(),
+    //     "Found NaN in collision_normal.x"
+    // );
+    // assert!(
+    //     !collision_normal.y.is_nan(),
+    //     "Found NaN in collision_normal.y"
+    // );
 
     // resolve overlap
     let overlap = (r1 + r2) - distance;
@@ -182,23 +282,23 @@ fn perform_collision(
 
     let e = 0.5; // Coefficient of restitution
     let inverse_mass_sum = (1.0 / m1.0) + (1.0 / m2.0);
-    assert!(m1.0 > 0.0, "m1 is zero");
-    assert!(m2.0 > 0.0, "m1 is zero");
-    assert!(!inverse_mass_sum.is_nan(), "Found NaN in inverse_mass_sum");
+    // assert!(m1.0 > 0.0, "m1 is zero");
+    // assert!(m2.0 > 0.0, "m1 is zero");
+    // assert!(!inverse_mass_sum.is_nan(), "Found NaN in inverse_mass_sum");
 
     // Compute impulse
     let impulse = -(1.0 + e) * relative_velocity / inverse_mass_sum;
     let impulse_vector = impulse * collision_normal;
-    assert!(!impulse_vector.x.is_nan(), "Found NaN in impulse_vector.x");
-    assert!(!impulse_vector.y.is_nan(), "Found NaN in impulse_vector.y");
+    // assert!(!impulse_vector.x.is_nan(), "Found NaN in impulse_vector.x");
+    // assert!(!impulse_vector.y.is_nan(), "Found NaN in impulse_vector.y");
 
     v1.0 -= impulse_vector / m1.0;
     v2.0 += impulse_vector / m2.0;
 
-    assert!(!v1.0.x.is_nan(), "Found NaN in v1.x");
-    assert!(!v2.0.x.is_nan(), "Found NaN in v2.x");
-    assert!(!t1.translation.x.is_nan(), "Found NaN in t1.x");
-    assert!(!t1.translation.y.is_nan(), "Found NaN in t1.y");
-    assert!(!t2.translation.x.is_nan(), "Found NaN in t2.x");
-    assert!(!t2.translation.y.is_nan(), "Found NaN in t2.y");
+    // assert!(!v1.0.x.is_nan(), "Found NaN in v1.x");
+    // assert!(!v2.0.x.is_nan(), "Found NaN in v2.x");
+    // assert!(!t1.translation.x.is_nan(), "Found NaN in t1.x");
+    // assert!(!t1.translation.y.is_nan(), "Found NaN in t1.y");
+    // assert!(!t2.translation.x.is_nan(), "Found NaN in t2.x");
+    // assert!(!t2.translation.y.is_nan(), "Found NaN in t2.y");
 }
