@@ -140,6 +140,18 @@ pub struct SortedBallsCache {
     sorted_entities: Vec<SortedEntity>,
 }
 
+impl SortedBallsCache {
+    pub fn add(&mut self, entity: Entity, transform: Transform) {
+        let left_bound = transform.translation.x - transform.scale.x / 2.0;
+        let right_bound = transform.translation.x + transform.scale.x / 2.0;
+        self.sorted_entities.push(SortedEntity {
+            entity,
+            left_bound,
+            right_bound,
+        });
+    }
+}
+
 pub fn update_sorted_balls_cache(
     mut cache: ResMut<SortedBallsCache>,
     query: Query<(Entity, &Transform), With<Ball>>,

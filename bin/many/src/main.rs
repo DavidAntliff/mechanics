@@ -74,11 +74,8 @@ fn main() {
             apply_velocity_system,
             //naive_ball_collision_system,
             //sweep_and_prune_collision_system,
-            (
-                update_sorted_balls_cache,
-                sweep_and_prune_collision_system_with_cache,
-            )
-                .chain(),
+            update_sorted_balls_cache,
+            sweep_and_prune_collision_system_with_cache,
             ball_warp_system,
         )
             .chain(),

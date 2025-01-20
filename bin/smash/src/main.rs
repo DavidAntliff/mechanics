@@ -5,6 +5,7 @@ use bevy_rand::prelude::*;
 use clap::Parser;
 use scarlet::colormap::{ColorMap, GradientColorMap};
 use scarlet::prelude::*;
+use stuff::ball::SortedBallsCache;
 #[allow(unused_imports)]
 use stuff::ball::{
     apply_velocity_system, ball_warp_system, naive_ball_collision_system,
@@ -53,11 +54,8 @@ fn main() {
                 apply_velocity_system,
                 //naive_ball_collision_system,
                 //sweep_and_prune_collision_system,
-                (
-                    update_sorted_balls_cache,
-                    sweep_and_prune_collision_system_with_cache,
-                )
-                    .chain(),
+                update_sorted_balls_cache,
+                sweep_and_prune_collision_system_with_cache,
                 ball_warp_system,
             )
                 .chain(),
@@ -177,6 +175,7 @@ fn handle_input(
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut rng: ResMut<GlobalEntropy<ChaCha8Rng>>,
     window: Query<&Window>,
+    mut ball_cache: ResMut<SortedBallsCache>,
 ) {
     if keyboard_input.just_pressed(KeyCode::Enter) {
         let width = window.single().width();
@@ -199,17 +198,21 @@ fn handle_input(
             color: bevy::prelude::Color::srgb(1.0, 0.0, 0.0),
         };
 
-        commands.spawn((
+        let transform = Transform::from_translation(ball.starting_position)
+            .with_scale(Vec2::splat(ball.diameter).extend(1.0));
+
+        let entity_commands = commands.spawn((
             MaterialMesh2dBundle {
                 mesh: meshes.add(Circle::default()).into(),
                 material: materials.add(ball.color),
-                transform: Transform::from_translation(ball.starting_position)
-                    .with_scale(Vec2::splat(ball.diameter).extend(1.0)),
+                transform,
                 ..default()
             },
             Ball,
             Velocity(ball.initial_direction.normalize() * ball.speed),
             Mass(ball.mass),
         ));
+
+        ball_cache.add(entity_commands.id(), transform);
     }
 }
